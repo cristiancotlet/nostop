@@ -4,7 +4,9 @@ Trading signals and position analysis app with Supabase and Vercel.
 
 ## Vercel deployment
 
-Add these **Environment Variables** in Vercel → Settings → Environment Variables:
+1. **Framework**: Ensure "Framework Preset" is **Next.js** (Vercel usually auto-detects).
+2. **Output Directory**: Leave **empty** – do not set to "public" (Next.js uses `.next`).
+3. **Environment Variables**: Add these in Vercel → Settings → Environment Variables:
 
 | Variable | Description |
 |----------|-------------|
