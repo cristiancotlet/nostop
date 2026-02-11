@@ -48,3 +48,4 @@ next-env.d.ts
 /scripts
 !scripts/setup-supabase.mjs
 /test-import.ts
+text.txt
