@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
-import { AppHeader } from "@/components/AppHeader";
-import { ContentWrapper } from "@/components/layout/ContentWrapper";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 export const metadata: Metadata = {
   title: "nostop.app",
@@ -25,15 +22,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SidebarProvider>
-            <AppSidebar />
-            <SidebarInset>
-              <AppHeader />
-              <div className="flex-1 overflow-auto min-w-0">
-                <ContentWrapper>{children}</ContentWrapper>
-              </div>
-            </SidebarInset>
-          </SidebarProvider>
+          <AppLayout>{children}</AppLayout>
         </ThemeProvider>
       </body>
     </html>
