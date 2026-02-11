@@ -1,0 +1,155 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model OHLCData {
+  id        String   @id @default(cuid())
+  timestamp DateTime
+  instrument String
+  timeframe String
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  signals      Signal[]
+  positionLogs  PositionLog[]
+
+  @@index([instrument, timeframe, timestamp])
+  @@map("ohlc_data")
+}
+
+model Strategy {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  rules       String   // Strategy rules as text/prompt
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  signals     Signal[]
+  aiLearnings AILearning[]
+
+  @@map("strategies")
+}
+
+model Signal {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  instrument  String
+  timeframe   String
+  signal      String   // BUY, SELL, or HOLD
+  reasoning   String
+  strategyId  String?
+  ohlcDataId  String?
+  createdAt   DateTime @default(now())
+
+  strategy    Strategy?  @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  ohlcData    OHLCData?  @relation(fields: [ohlcDataId], references: [id], onDelete: SetNull)
+  positions   Position[]
+
+  @@index([instrument, timeframe, timestamp])
+  @@index([strategyId])
+  @@map("signals")
+}
+
+model Position {
+  id                String   @id @default(cuid())
+  signalId          String
+  entryPrice        Float?   // Preserved when Signal's OHLCData is deleted
+  entryConfirmedAt  DateTime?
+  exitConfirmedAt   DateTime?
+  status            String   @default("OPEN") // OPEN or CLOSED
+  currentCandleCount Int      @default(0)
+  learningInsights  String?  // JSON array of 3 learning insights from AI analysis
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  signal      Signal        @relation(fields: [signalId], references: [id], onDelete: Restrict)
+  positionLogs PositionLog[]
+
+  @@index([status])
+  @@index([signalId])
+  @@map("positions")
+}
+
+model PositionLog {
+  id            String   @id @default(cuid())
+  positionId    String
+  candleTimestamp DateTime
+  conclusion    String
+  ohlcDataId    String?
+  closePrice    Float?   // Preserved when OHLCData is deleted
+  ticksPnL     Int?     // Ticks in profit (+) or loss (-) at candle close
+  createdAt     DateTime @default(now())
+
+  position  Position  @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  ohlcData  OHLCData? @relation(fields: [ohlcDataId], references: [id], onDelete: SetNull)
+
+  @@index([positionId])
+  @@map("position_logs")
+}
+
+model AILearning {
+  id              String   @id @default(cuid())
+  strategyId      String
+  analysis        String
+  positionsAnalyzed Int
+  createdAt       DateTime @default(now())
+
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@index([strategyId])
+  @@map("ai_learnings")
+}
+
+model BacktestDataset {
+  id             String   @id @default(cuid())
+  name           String   // instrument name
+  instrumentType String   @default("CL") // GC, HG, CL, NG - for tick size
+  timeframe      String
+  startDate      DateTime
+  createdAt      DateTime @default(now())
+
+  ohlc BacktestOHLC[]
+
+  @@map("backtest_datasets")
+}
+
+model BacktestOHLC {
+  id        String   @id @default(cuid())
+  datasetId String
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+
+  dataset BacktestDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([datasetId, timestamp])
+  @@map("backtest_ohlc")
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   // encrypted
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
