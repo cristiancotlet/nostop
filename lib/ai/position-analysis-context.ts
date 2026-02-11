@@ -36,7 +36,7 @@ function buildPriceTrajectory(input: PriceTrajectoryInput): string {
   const candleRange = newCandle.high - newCandle.low;
   const direction = bodySize > 0 ? 'bullish' : bodySize < 0 ? 'bearish' : 'doji';
   const bodyPct = candleRange > 0 ? (Math.abs(bodySize) / candleRange * 100).toFixed(0) : '0';
-  const momentumNote = direction === 'doji' ? ' — Momentum may be weakening; consider EXIT if in profit' : '';
+  const momentumNote = direction === 'doji' ? ' — Momentum may be weakening' : '';
   lines.push(`- Current candle: ${direction} (body ${bodyPct}% of range)${momentumNote}`);
 
   // Combine swing zones and rays for levels (rays can act as resistance/support)
@@ -54,9 +54,9 @@ function buildPriceTrajectory(input: PriceTrajectoryInput): string {
       const dist = ((nearestResAbove - currentPrice) / currentPrice * 100).toFixed(2);
       const distPct = parseFloat(dist);
       let speedNote = '';
-      if (bodySize > 0 && distPct < 0.3) speedNote = ' — EXIT: Price very close to resistance; capture profit before reaction';
-      else if (bodySize > 0 && distPct < 0.5) speedNote = ' — WARNING: Price moving up rapidly toward resistance; consider EXIT';
-      else if (bodySize > 0 && distPct < 1) speedNote = ' — Approaching resistance; monitor for EXIT';
+      if (bodySize > 0 && distPct < 0.3) speedNote = ' — Price very close to resistance';
+      else if (bodySize > 0 && distPct < 0.5) speedNote = ' — Price moving up toward resistance';
+      else if (bodySize > 0 && distPct < 1) speedNote = ' — Approaching resistance';
       lines.push(`- Nearest resistance above: ${nearestResAbove.toFixed(4)} (${dist}% away)${speedNote}`);
     } else {
       lines.push('- No resistance above current price');
@@ -70,9 +70,9 @@ function buildPriceTrajectory(input: PriceTrajectoryInput): string {
       const dist = ((currentPrice - nearestSupBelow) / currentPrice * 100).toFixed(2);
       const distPct = parseFloat(dist);
       let speedNote = '';
-      if (bodySize < 0 && distPct < 0.3) speedNote = ' — EXIT: Price very close to support; capture profit before reaction';
-      else if (bodySize < 0 && distPct < 0.5) speedNote = ' — WARNING: Price moving down rapidly toward support; consider EXIT';
-      else if (bodySize < 0 && distPct < 1) speedNote = ' — Approaching support; monitor for EXIT';
+      if (bodySize < 0 && distPct < 0.3) speedNote = ' — Price very close to support';
+      else if (bodySize < 0 && distPct < 0.5) speedNote = ' — Price moving down toward support';
+      else if (bodySize < 0 && distPct < 1) speedNote = ' — Approaching support';
       lines.push(`- Nearest support below: ${nearestSupBelow.toFixed(4)} (${dist}% away)${speedNote}`);
     } else {
       lines.push('- No support below current price');
@@ -149,8 +149,8 @@ export function buildPositionAnalysisContext(params: {
     const content = buildPriceTrajectory(params.priceTrajectory);
     if (content.trim()) {
       sections.push({
-        label: 'PRICE TRAJECTORY (approaching zones that may react against the position)',
-        content: 'CRITICAL: If price is in profit and approaching resistance (BUY) or support (SELL), favor EXIT to capture profit before reaction.\n' + content,
+        label: 'PRICE TRAJECTORY (key levels and price direction)',
+        content: 'Use this to assess where price may interact with key levels. EXIT only when the market shows actual reaction (rejection, failure, structure break)—not just proximity to a level.\n' + content,
       });
     }
   }

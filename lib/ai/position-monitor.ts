@@ -72,14 +72,13 @@ export async function analyzePositionProgressFromDTO(
   const recommendationPrompt = dto.recommendationMode
     ? `You are re-evaluating an open position. CANDLE ${candleNum}. Recommend HOLD or EXIT.
 
-OBJECTIVE: Maximize profit capture. Be PROACTIVE—look for upcoming signs that price is heading into a zone that may REACT AGAINST our position. Suggest EXIT to capture profit BEFORE price reverses.
+OBJECTIVE: Be driven by what the market says. Recommend EXIT only when there is an actual market reason—price action, structure, or indicator signaling reversal, exhaustion, or invalidation. Do NOT rush to capture profit if there is no market signal.
 
 KEY RULES:
-- When in PROFIT and price is approaching resistance (BUY) or support (SELL): PREFER EXIT to lock gains. Do not wait for reversal confirmation—by then profit is often gone.
-- When price is moving strongly in our favor toward a key level: consider EXIT before the level—zones often cause reactions.
-- When momentum weakens (e.g. smaller body, doji, rejection wick): consider EXIT—trend may be exhausting.
-- HOLD only when: thesis is clearly valid, no key level nearby, and no signs of exhaustion or reversal.
-- When price moves against us: exit when the market clearly signals no reversal, but do not hold hoping—cut losses.
+- EXIT when: price shows reversal at a key level (rejection wick, bearish engulfing at resistance, etc.), momentum clearly exhausts (sequence of weaker candles, failure at level), or structure breaks against the thesis.
+- HOLD when: thesis is still valid and the market has not given a reason to exit. Do not exit just because we are in profit or approaching a level—wait for the market to show reaction.
+- Avoid bias: neither favor EXIT (to lock gains) nor HOLD (to let run). Let price action, indicators, and structure decide.
+- When price moves against us: exit when the market clearly signals no reversal; do not hold hoping.
 
 Analyze the FULL price evolution since entry (not just the latest candle). Use indicator levels, swing zones, rays, and regime. Focus on the latest candle for new signals, but consider the trajectory.
 
@@ -145,7 +144,7 @@ Respond with a JSON object:
 }`;
 
   const systemContent = dto.recommendationMode
-    ? 'You are a proactive position monitor. Goal: capture profit before it disappears. Favor EXIT when: price is in profit and approaching a key level (resistance/support), momentum weakens, or structure suggests reversal. HOLD only when thesis is clearly valid and no immediate risk. Be responsive—do not default to HOLD. Output HOLD or EXIT plus one short, specific reason. Always valid JSON only.'
+    ? 'You are a market-driven position monitor. Recommend EXIT only when price action, structure, or indicators give an actual reason (reversal at level, exhaustion, structure break). Do not exit just to capture profit—wait for the market to signal. HOLD when thesis is valid and no market reason to exit. Output HOLD or EXIT plus one short, specific reason. Always valid JSON only.'
     : 'You are a trading position monitor. Provide VERY SHORT (1-2 sentences) performance assessments comparing current price action with the initial entry decision. Always respond with valid JSON only.';
 
   try {
