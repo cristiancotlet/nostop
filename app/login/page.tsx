@@ -26,7 +26,11 @@ function LoginForm() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setMessage({ type: 'error', text: error.message });
+        // Show user-friendly message; 400 often means invalid credentials or user not found
+        const text =
+          error.message ||
+          (error.status === 400 ? 'Invalid email or password, or user not created in Supabase.' : 'Sign in failed.');
+        setMessage({ type: 'error', text });
         return;
       }
       router.push(redirect);

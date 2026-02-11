@@ -72,8 +72,16 @@ export async function analyzePositionProgressFromDTO(
   const recommendationPrompt = dto.recommendationMode
     ? `You are re-evaluating an open position. CANDLE ${candleNum}. Recommend HOLD or EXIT.
 
-OBJECTIVE: Maximize profit capture. Analyze price evolution (OHLC) since entry, not just the last candle. Watch indicator levels—if new levels appear or shift, factor that in. When price moves in our favor toward resistance (BUY) or support (SELL), consider capturing profit before a reaction. When price moves against us, understand why and exit only when the market clearly signals it will not turn in our favor.
-CRITICAL: Do NOT repeat or rephrase what was previously concluded. Each new candle brings NEW information. Focus on what is DIFFERENT or CHANGED with this specific candle—new price level, new interaction with indicator, new structure break, etc. Give a FRESH perspective.
+OBJECTIVE: Maximize profit capture. Be PROACTIVE—look for upcoming signs that price is heading into a zone that may REACT AGAINST our position. Suggest EXIT to capture profit BEFORE price reverses.
+
+KEY RULES:
+- When in PROFIT and price is approaching resistance (BUY) or support (SELL): PREFER EXIT to lock gains. Do not wait for reversal confirmation—by then profit is often gone.
+- When price is moving strongly in our favor toward a key level: consider EXIT before the level—zones often cause reactions.
+- When momentum weakens (e.g. smaller body, doji, rejection wick): consider EXIT—trend may be exhausting.
+- HOLD only when: thesis is clearly valid, no key level nearby, and no signs of exhaustion or reversal.
+- When price moves against us: exit when the market clearly signals no reversal, but do not hold hoping—cut losses.
+
+Analyze the FULL price evolution since entry (not just the latest candle). Use indicator levels, swing zones, rays, and regime. Focus on the latest candle for new signals, but consider the trajectory.
 
 POSITION TYPE: ${entrySignal}
 ENTRY: ${entrySignal} @ ${entryPrice}
@@ -83,7 +91,7 @@ P/L TRACK RECORD (ticks at each candle close—positive = profit, negative = los
 - Previous: ${ticksTrack}
 - This candle: ${newCandleTicks}
 
-THIS CANDLE (candle ${candleNum}—what does it add that previous candles did not?):
+THIS CANDLE (candle ${candleNum}—what does it add?):
 - Time: ${ts} | O: ${dto.newCandle.open} H: ${dto.newCandle.high} L: ${dto.newCandle.low} C: ${currentPrice}
 - Vs entry: ${priceChange > 0 ? '+' : ''}${priceChange.toFixed(2)}%
 
@@ -91,16 +99,16 @@ ${dto.contextSections ? dto.contextSections + '\n\n' : ''}
 ${!dto.contextSections && dto.strategyRules ? `STRATEGY RULES:\n${dto.strategyRules}\n` : ''}
 ${!dto.contextSections && dto.indicatorContext ? `INDICATOR & PRICE CONTEXT (Swing Zone):\n${dto.indicatorContext}\n` : ''}
 
-PREVIOUS CONCLUSIONS (do NOT repeat these—find what is NEW):
+PREVIOUS CONCLUSIONS (do NOT repeat—find what is NEW):
 ${previousLogs.length > 0 ? previousLogs.map((l, i) => `Candle ${i + 1}: ${l.conclusion}`).join('\n') : 'None yet'}
-${lastLog ? `\nLast candle concluded: "${lastLog.conclusion}" — NOW with THIS new candle, what CHANGED? New level? New structure? New signal?` : ''}
+${lastLog ? `\nLast: "${lastLog.conclusion}" — What CHANGED with this candle?` : ''}
 
-Provide a NEW, specific reason. What does THIS candle tell you that the previous ones did not? Output ONLY recommendation and one short reason.
+Provide a NEW, specific reason. Output ONLY recommendation and one short reason.
 
 Respond with a JSON object:
 {
   "recommendation": "HOLD" or "EXIT",
-  "reason": "One short sentence: NEW insight from this candle—what changed, what's different, what new signal."
+  "reason": "One short sentence: NEW insight—what changed, what signals exit or hold."
 }`
     : `You are monitoring a trading position. Compare the current price action with the initial decision to enter the position and provide a VERY SHORT performance assessment.
 
@@ -137,7 +145,7 @@ Respond with a JSON object:
 }`;
 
   const systemContent = dto.recommendationMode
-    ? 'You are a position monitor. Your goal: capture maximum profit the market offers. Analyze full price path since entry and indicator levels (new or shifting). In profit toward resistance/support? Consider exiting before reaction. Against us? Exit only when market clearly signals no reversal. Output HOLD or EXIT plus one short, specific reason. Never repeat previous conclusions. Always valid JSON only.'
+    ? 'You are a proactive position monitor. Goal: capture profit before it disappears. Favor EXIT when: price is in profit and approaching a key level (resistance/support), momentum weakens, or structure suggests reversal. HOLD only when thesis is clearly valid and no immediate risk. Be responsive—do not default to HOLD. Output HOLD or EXIT plus one short, specific reason. Always valid JSON only.'
     : 'You are a trading position monitor. Provide VERY SHORT (1-2 sentences) performance assessments comparing current price action with the initial entry decision. Always respond with valid JSON only.';
 
   try {

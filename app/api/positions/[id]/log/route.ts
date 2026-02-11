@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { analyzePositionProgress } from '@/lib/ai/position-monitor';
+import { processPositionLogsForNewCandle } from '@/lib/position-log-processor';
 
 const addLogSchema = z.object({
   ohlcDataId: z.string(),
@@ -15,39 +15,20 @@ export async function POST(
     const body = await request.json();
     const { ohlcDataId } = addLogSchema.parse(body);
 
-    // Fetch position
     const position = await prisma.position.findUnique({
       where: { id: params.id },
       include: {
-        signal: {
-          include: {
-            strategy: true,
-            ohlcData: true,
-          },
-        },
-        positionLogs: {
-          include: {
-            ohlcData: true,
-          },
-          orderBy: {
-            candleTimestamp: 'asc',
-          },
-        },
+        signal: { include: { strategy: true, ohlcData: true } },
+        positionLogs: { include: { ohlcData: true }, orderBy: { candleTimestamp: 'asc' } },
       },
     });
 
     if (!position) {
-      return NextResponse.json(
-        { error: 'Position not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Position not found' }, { status: 404 });
     }
 
     if (position.status === 'CLOSED') {
-      return NextResponse.json(
-        { error: 'Cannot add log to closed position' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Cannot add log to closed position' }, { status: 400 });
     }
 
     if (position.currentCandleCount >= 10) {
@@ -57,39 +38,33 @@ export async function POST(
       );
     }
 
-    // Fetch OHLC data
     const ohlcData = await prisma.oHLCData.findUnique({
       where: { id: ohlcDataId },
     });
 
     if (!ohlcData) {
-      return NextResponse.json(
-        { error: 'OHLC data not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'OHLC data not found' }, { status: 404 });
     }
 
-    // Call AI service to analyze position progress
-    const aiResult = await analyzePositionProgress(position, ohlcData);
+    // Use shared processor with recommendation mode (HOLD/EXIT)
+    await processPositionLogsForNewCandle(
+      ohlcDataId,
+      position.signal.instrument,
+      position.signal.timeframe,
+      params.id
+    );
 
-    // Create position log
-    const positionLog = await prisma.positionLog.create({
-      data: {
-        positionId: params.id,
-        candleTimestamp: ohlcData.timestamp,
-        conclusion: aiResult.conclusion,
-        ohlcDataId,
-        closePrice: ohlcData.close,
-      },
-    });
-
-    // Update position candle count
-    const updatedPosition = await prisma.position.update({
+    const updatedPosition = await prisma.position.findUnique({
       where: { id: params.id },
-      data: {
-        currentCandleCount: position.currentCandleCount + 1,
+      include: {
+        signal: { include: { strategy: true, ohlcData: true } },
+        positionLogs: { include: { ohlcData: true }, orderBy: { candleTimestamp: 'asc' } },
       },
     });
+
+    const positionLog = updatedPosition?.positionLogs.find(
+      (l) => l.candleTimestamp.getTime() === ohlcData.timestamp.getTime()
+    );
 
     return NextResponse.json({
       success: true,

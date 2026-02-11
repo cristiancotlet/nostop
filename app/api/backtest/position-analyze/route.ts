@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { analyzePositionProgressFromDTO } from '@/lib/ai/position-monitor';
 import { buildPositionAnalysisContext, formatContextForPrompt } from '@/lib/ai/position-analysis-context';
 import { formatRulesForPrompt } from '@/lib/strategy-rules';
-import { calculateSwingZone, SwingZoneSettings } from '@/lib/indicators/custom-indicator';
+import { calculateSwingZone, calculateSwingRays, SwingZoneSettings } from '@/lib/indicators/custom-indicator';
 import { computeTicksPnL } from '@/lib/instruments';
 
 const ohlcSchema = z.object({
@@ -19,6 +19,9 @@ const logSchema = z.object({
   candleTimestamp: z.union([z.string(), z.date()]),
   conclusion: z.string(),
   close: z.number(),
+  open: z.number().optional(),
+  high: z.number().optional(),
+  low: z.number().optional(),
   ticksPnL: z.number().optional(),
 });
 
@@ -27,6 +30,7 @@ const backtestPositionAnalyzeSchema = z.object({
   chartData: z.array(ohlcSchema).optional(),
   entrySignal: z.string(),
   entryPrice: z.number(),
+  entryCandle: ohlcSchema.optional(),
   initialReasoning: z.string(),
   positionLogs: z.array(logSchema),
   newCandle: ohlcSchema,
@@ -40,7 +44,7 @@ export async function POST(request: NextRequest) {
     const parsed = backtestPositionAnalyzeSchema.parse(body);
 
     let strategyRules = '';
-    let swingZone: { swingHighs: Array<{ price: number }>; swingLows: Array<{ price: number }>; regime?: { regime?: string } } | undefined;
+    let swingZone: { swingHighs: Array<{ price: number }>; swingLows: Array<{ price: number }>; rayHighs?: Array<{ price: number }>; rayLows?: Array<{ price: number }>; regime?: { regime?: string } } | undefined;
     let recentCandles: Array<{ ts: string; o: number; h: number; l: number; c: number }> | undefined;
 
     if (parsed.strategyId) {
@@ -67,16 +71,18 @@ export async function POST(request: NextRequest) {
         rayOpacity: 50,
       };
 
-      const chartData = parsed.chartData.slice(-100).map((c) => ({
+      const chartDataForIndicator = parsed.chartData.slice(-100).map((c) => ({
         high: c.high,
         low: c.low,
         close: c.close,
         timestamp: typeof c.timestamp === 'string' ? c.timestamp : new Date(c.timestamp).toISOString(),
       }));
 
-      swingZone = calculateSwingZone(chartData, swingZoneSettings);
+      swingZone = calculateSwingZone(chartDataForIndicator, swingZoneSettings);
+      const rays = calculateSwingRays(chartDataForIndicator, swingZoneSettings);
+      swingZone = { ...swingZone, rayHighs: rays.rayHighs, rayLows: rays.rayLows };
 
-      recentCandles = parsed.chartData.slice(-8).map((c) => ({
+      recentCandles = parsed.chartData.slice(-20).map((c) => ({
         ts: typeof c.timestamp === 'string' ? c.timestamp : new Date(c.timestamp).toISOString(),
         o: c.open,
         h: c.high,
@@ -85,10 +91,42 @@ export async function POST(request: NextRequest) {
       }));
     }
 
+    // Build full price evolution since entry (entry + all logs + new candle) for trajectory analysis
+    const priceEvolutionSinceEntry: Array<{ ts: string; o: number; h: number; l: number; c: number }> = [];
+    if (parsed.entryCandle) {
+      priceEvolutionSinceEntry.push({
+        ts: typeof parsed.entryCandle.timestamp === 'string' ? parsed.entryCandle.timestamp : new Date(parsed.entryCandle.timestamp).toISOString(),
+        o: parsed.entryCandle.open,
+        h: parsed.entryCandle.high,
+        l: parsed.entryCandle.low,
+        c: parsed.entryCandle.close,
+      });
+    }
+    for (const log of parsed.positionLogs) {
+      const o = log.open ?? log.close;
+      const h = log.high ?? log.close;
+      const l = log.low ?? log.close;
+      priceEvolutionSinceEntry.push({
+        ts: typeof log.candleTimestamp === 'string' ? log.candleTimestamp : new Date(log.candleTimestamp).toISOString(),
+        o,
+        h,
+        l,
+        c: log.close,
+      });
+    }
+    priceEvolutionSinceEntry.push({
+      ts: typeof parsed.newCandle.timestamp === 'string' ? parsed.newCandle.timestamp : new Date(parsed.newCandle.timestamp).toISOString(),
+      o: parsed.newCandle.open,
+      h: parsed.newCandle.high,
+      l: parsed.newCandle.low,
+      c: parsed.newCandle.close,
+    });
+
     const contextSections = buildPositionAnalysisContext({
       strategyRules: strategyRules || undefined,
       swingZone,
       recentCandles,
+      priceEvolutionSinceEntry: priceEvolutionSinceEntry.length > 0 ? priceEvolutionSinceEntry : undefined,
       priceTrajectory: swingZone
         ? {
             entrySignal: parsed.entrySignal,
@@ -97,6 +135,8 @@ export async function POST(request: NextRequest) {
             newCandle: parsed.newCandle,
             swingHighs: swingZone.swingHighs,
             swingLows: swingZone.swingLows,
+            rayHighs: swingZone.rayHighs,
+            rayLows: swingZone.rayLows,
             recentCandles: recentCandles?.map((c) => ({ o: c.o, h: c.h, l: c.l, c: c.c })),
           }
         : undefined,
